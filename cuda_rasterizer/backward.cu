@@ -303,6 +303,8 @@ renderCUDA(
 			
 			// Compute accurate depth when necessary
 			float c_d = (rho3d <= rho2d) ? (s.x * Tw.x + s.y * Tw.y) + Tw.z : Tw.z;
+			float2 normal_scaling = collected_normal_scalings[j];
+			c_d += normal_scaling.x * s.x + normal_scaling.y * s.y;
 			if (c_d < NEAR_PLANE) continue;
 
 			float4 nor_o = collected_normal_opacity[j];
