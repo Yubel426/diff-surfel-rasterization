@@ -43,6 +43,8 @@ namespace CudaRasterizer
 			const float scale_modifier,
 			const float* rotations,
 			const float* transMat_precomp,
+			const float* center_normals,
+			const float* normal_scalings,
 			const float* viewmatrix,
 			const float* projmatrix,
 			const float* cam_pos,
