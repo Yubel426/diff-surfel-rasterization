@@ -59,6 +59,7 @@ namespace FORWARD
 		const float2* points_xy_image,
 		const float* features,
 		const float* transMats,
+		const float* normal_scalings,
 		const float* depths,
 		const float4* normal_opacity,
 		float* final_T,
