@@ -66,6 +66,8 @@ namespace CudaRasterizer
 			const float scale_modifier,
 			const float* rotations,
 			const float* transMat_precomp,
+			const float* center_normals,
+			const float* normal_scalings,
 			const float* viewmatrix,
 			const float* projmatrix,
 			const float* campos,
@@ -85,6 +87,7 @@ namespace CudaRasterizer
 			float* dL_dsh,
 			float* dL_dscale,
 			float* dL_drot,
+			float* dL_dnormal_scalings,
 			bool debug);
 	};
 };
