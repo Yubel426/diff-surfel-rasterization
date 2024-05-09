@@ -272,6 +272,7 @@ renderCUDA(
 	const float2* __restrict__ points_xy_image,
 	const float* __restrict__ features,
 	const float* __restrict__ transMats,
+	const float* __restrict__ normal_scalings,
 	const float* __restrict__ depths,
 	const float4* __restrict__ normal_opacity,
 	float* __restrict__ final_T,
@@ -306,6 +307,7 @@ renderCUDA(
 	__shared__ float3 collected_Tu[BLOCK_SIZE];
 	__shared__ float3 collected_Tv[BLOCK_SIZE];
 	__shared__ float3 collected_Tw[BLOCK_SIZE];
+	__shared__ float2 collected_normal_scaling[BLOCK_SIZE];
 
 	// Initialize helper variables
 	float T = 1.0f;
@@ -346,6 +348,7 @@ renderCUDA(
 			collected_Tu[block.thread_rank()] = {transMats[9 * coll_id+0], transMats[9 * coll_id+1], transMats[9 * coll_id+2]};
 			collected_Tv[block.thread_rank()] = {transMats[9 * coll_id+3], transMats[9 * coll_id+4], transMats[9 * coll_id+5]};
 			collected_Tw[block.thread_rank()] = {transMats[9 * coll_id+6], transMats[9 * coll_id+7], transMats[9 * coll_id+8]};
+			collected_normal_scaling[block.thread_rank()] = {normal_scalings[2 * coll_id], normal_scalings[2 * coll_id + 1]};
 		}
 		block.sync();
 
@@ -382,6 +385,8 @@ renderCUDA(
 			float rho = min(rho3d, rho2d);
 			
 			float depth = (rho3d <= rho2d) ? (s.x * Tw.x + s.y * Tw.y) + Tw.z : Tw.z; // splat depth
+			float2 normal_scaling = collected_normal_scaling[j];
+			depth += normal_scaling.x * s.x + normal_scaling.y * s.y;
 			if (depth < NEAR_PLANE) continue;
 			float4 nor_o = collected_normal_opacity[j];
 			float normal[3] = {nor_o.x, nor_o.y, nor_o.z};
@@ -471,6 +476,7 @@ void FORWARD::render(
 	const float2* means2D,
 	const float* colors,
 	const float* transMats,
+	const float* normal_scalings,
 	const float* depths,
 	const float4* normal_opacity,
 	float* final_T,
@@ -487,6 +493,7 @@ void FORWARD::render(
 		means2D,
 		colors,
 		transMats,
+		normal_scalings,
 		depths,
 		normal_opacity,
 		final_T,

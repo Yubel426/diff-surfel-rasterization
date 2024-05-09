@@ -46,6 +46,8 @@ RasterizeGaussiansCUDA(
 	const torch::Tensor& rotations,
 	const float scale_modifier,
 	const torch::Tensor& transMat_precomp,
+	const torch::Tensor& center_normals,
+	const torch::Tensor& normal_scalings,
 	const torch::Tensor& viewmatrix,
 	const torch::Tensor& projmatrix,
 	const float tan_fovx, 
@@ -81,6 +83,8 @@ RasterizeGaussiansCUDA(
   CHECK_INPUT(scales);
   CHECK_INPUT(rotations);
   CHECK_INPUT(transMat_precomp);
+  CHECK_INPUT(center_normals);
+  CHECK_INPUT(normal_scalings);
   CHECK_INPUT(viewmatrix);
   CHECK_INPUT(projmatrix);
   CHECK_INPUT(sh);
@@ -126,6 +130,8 @@ RasterizeGaussiansCUDA(
 		scale_modifier,
 		rotations.contiguous().data_ptr<float>(),
 		transMat_precomp.contiguous().data<float>(), 
+		center_normals.contiguous().data<float>(),
+		normal_scalings.contiguous().data<float>(),
 		viewmatrix.contiguous().data<float>(), 
 		projmatrix.contiguous().data<float>(),
 		campos.contiguous().data<float>(),
@@ -140,9 +146,9 @@ RasterizeGaussiansCUDA(
   return std::make_tuple(rendered, out_color, out_others, radii, geomBuffer, binningBuffer, imgBuffer);
 }
 
-std::tuple<torch::Tensor, torch::Tensor, torch::Tensor, torch::Tensor, torch::Tensor, torch::Tensor, torch::Tensor, torch::Tensor>
+std::tuple<torch::Tensor, torch::Tensor, torch::Tensor, torch::Tensor, torch::Tensor, torch::Tensor, torch::Tensor, torch::Tensor, torch::Tensor, torch::Tensor>
  RasterizeGaussiansBackwardCUDA(
-	 const torch::Tensor& background,
+	const torch::Tensor& background,
 	const torch::Tensor& means3D,
 	const torch::Tensor& radii,
 	const torch::Tensor& colors,
@@ -150,6 +156,8 @@ std::tuple<torch::Tensor, torch::Tensor, torch::Tensor, torch::Tensor, torch::Te
 	const torch::Tensor& rotations,
 	const float scale_modifier,
 	const torch::Tensor& transMat_precomp,
+	const torch::Tensor& center_normals,
+	const torch::Tensor& normal_scalings,
 	const torch::Tensor& viewmatrix,
 	const torch::Tensor& projmatrix,
 	const float tan_fovx,
@@ -173,6 +181,8 @@ std::tuple<torch::Tensor, torch::Tensor, torch::Tensor, torch::Tensor, torch::Te
   CHECK_INPUT(scales);
   CHECK_INPUT(rotations);
   CHECK_INPUT(transMat_precomp);
+  CHECK_INPUT(center_normals);
+  CHECK_INPUT(normal_scalings);
   CHECK_INPUT(viewmatrix);
   CHECK_INPUT(projmatrix);
   CHECK_INPUT(sh);
@@ -200,7 +210,9 @@ std::tuple<torch::Tensor, torch::Tensor, torch::Tensor, torch::Tensor, torch::Te
   torch::Tensor dL_dsh = torch::zeros({P, M, 3}, means3D.options());
   torch::Tensor dL_dscales = torch::zeros({P, 2}, means3D.options());
   torch::Tensor dL_drotations = torch::zeros({P, 4}, means3D.options());
-  
+  torch::Tensor dL_dcenter_normals = torch::zeros({P, 2}, means3D.options());
+  torch::Tensor dL_dnormal_scalings = torch::zeros({P, 2}, means3D.options());
+
   if(P != 0)
   {  
 	  CudaRasterizer::Rasterizer::backward(P, degree, M, R,
@@ -236,7 +248,7 @@ std::tuple<torch::Tensor, torch::Tensor, torch::Tensor, torch::Tensor, torch::Te
 	  debug);
   }
 
-  return std::make_tuple(dL_dmeans2D, dL_dcolors, dL_dopacity, dL_dmeans3D, dL_dtransMat, dL_dsh, dL_dscales, dL_drotations);
+  return std::make_tuple(dL_dmeans2D, dL_dcolors, dL_dopacity, dL_dmeans3D, dL_dtransMat, dL_dsh, dL_dscales, dL_drotations, dL_dcenter_normals, dL_dnormal_scalings);
 }
 
 torch::Tensor markVisible(
