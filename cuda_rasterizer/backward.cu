@@ -152,6 +152,7 @@ renderCUDA(
 	const float4* __restrict__ normal_opacity,
 	const float* __restrict__ transMats,
 	const float* __restrict__ colors,
+	const float* __restrict__ normal_scalings,
 	const float* __restrict__ depths,
 	const float* __restrict__ final_Ts,
 	const uint32_t* __restrict__ n_contrib,
@@ -161,7 +162,8 @@ renderCUDA(
 	float3* __restrict__ dL_dmean2D,
 	float* __restrict__ dL_dnormal3D,
 	float* __restrict__ dL_dopacity,
-	float* __restrict__ dL_dcolors)
+	float* __restrict__ dL_dcolors,
+	float* __restrict__ dL_dnormal_scalings)
 {
 	// We rasterize again. Compute necessary block info.
 	auto block = cg::this_thread_block();
@@ -188,6 +190,7 @@ renderCUDA(
 	__shared__ float3 collected_Tv[BLOCK_SIZE];
 	__shared__ float3 collected_Tw[BLOCK_SIZE];
 	// __shared__ float collected_depths[BLOCK_SIZE];
+	__shared__ float2 collected_normal_scalings[BLOCK_SIZE];
 
 	// In the forward, we stored the final value for T, the
 	// product of all (1 - alpha) factors. 
@@ -264,6 +267,7 @@ renderCUDA(
 			collected_Tu[block.thread_rank()] = {transMats[9 * coll_id+0], transMats[9 * coll_id+1], transMats[9 * coll_id+2]};
 			collected_Tv[block.thread_rank()] = {transMats[9 * coll_id+3], transMats[9 * coll_id+4], transMats[9 * coll_id+5]};
 			collected_Tw[block.thread_rank()] = {transMats[9 * coll_id+6], transMats[9 * coll_id+7], transMats[9 * coll_id+8]};
+			collected_normal_scalings[block.thread_rank()] = {normal_scalings[2 * coll_id], normal_scalings[2 * coll_id + 1]};
 			for (int i = 0; i < C; i++)
 				collected_colors[i * BLOCK_SIZE + block.thread_rank()] = colors[coll_id * C + i];
 				// collected_depths[block.thread_rank()] = depths[coll_id];
@@ -308,6 +312,8 @@ renderCUDA(
 			
 			// Compute accurate depth when necessary
 			float c_d = (rho3d <= rho2d) ? (s.x * Tw.x + s.y * Tw.y) + Tw.z : Tw.z;
+			float2 normal_scaling = collected_normal_scalings[j];
+			c_d += normal_scaling.x * s.x + normal_scaling.y * s.y;
 			if (c_d < NEAR_PLANE) continue;
 
 			float4 nor_o = collected_normal_opacity[j];
@@ -401,7 +407,9 @@ renderCUDA(
 #if RENDER_AXUTILITY
 			dL_dz += alpha * T * dL_ddepth; 
 #endif
-
+			const float2 dL_dnormal_scaling = {dL_dz * s.x, dL_dz * s.y};
+			atomicAdd(&dL_dnormal_scalings[global_id * 2], dL_dnormal_scaling.x);
+			atomicAdd(&dL_dnormal_scalings[global_id * 2 + 1], dL_dnormal_scaling.y);
 			if (rho3d <= rho2d) {
 				// Update gradients w.r.t. covariance of Gaussian 3x3 (T)
 				float2 dL_ds = {
@@ -729,6 +737,7 @@ void BACKWARD::render(
 	const float4* normal_opacity,
 	const float* colors,
 	const float* transMats,
+	const float* normal_scalings,
 	const float* depths,
 	const float* final_Ts,
 	const uint32_t* n_contrib,
@@ -738,7 +747,8 @@ void BACKWARD::render(
 	float3* dL_dmean2D,
 	float* dL_dnormal3D,
 	float* dL_dopacity,
-	float* dL_dcolors)
+	float* dL_dcolors,
+	float* dL_dnormal_scalings)
 {
 	renderCUDA<NUM_CHANNELS> << <grid, block >> >(
 		ranges,
@@ -750,6 +760,7 @@ void BACKWARD::render(
 		normal_opacity,
 		transMats,
 		colors,
+		normal_scalings,
 		depths,
 		final_Ts,
 		n_contrib,
@@ -759,6 +770,7 @@ void BACKWARD::render(
 		dL_dmean2D,
 		dL_dnormal3D,
 		dL_dopacity,
-		dL_dcolors
+		dL_dcolors,
+		dL_dnormal_scalings
 		);
 }
