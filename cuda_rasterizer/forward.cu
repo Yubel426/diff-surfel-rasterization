@@ -236,12 +236,7 @@ __global__ void preprocessCUDA(int P, int D, int M,
 
 	depths[idx] = p_view.z;
 	radii[idx] = (int)radius;
-	points_xy_image[idx] = point_image;
-	glm::mat3 RS = quat_to_rotmat(rotations[idx]) * scale_to_mat({scales[idx].x, scales[idx].y, 1.0f}, 1.0f);
-	float3 RS0 = transformVec4x3({RS[0].x, RS[0].y, RS[0].z}, viewmatrix);
-	float3 RS1 = transformVec4x3({RS[1].x, RS[1].y, RS[1].z}, viewmatrix);
-	float3 RS2 = transformVec4x3({RS[2].x, RS[2].y, RS[2].z}, viewmatrix);
-	glm::mat3 RS_view = glm::mat3(RS0.x, RS0.y, RS0.z, RS1.x, RS1.y, RS1.z, RS2.x, RS2.y, RS2.z);
+	points_xy_image[idx] = center;
 	// store them in float4
 	normal_opacity[idx] = {normal.x, normal.y, normal.z, opacities[idx]};
 	tiles_touched[idx] = (rect_max.y - rect_min.y) * (rect_max.x - rect_min.x);
@@ -372,12 +367,7 @@ renderCUDA(
 			depth += normal_scaling.x * s.x + normal_scaling.y * s.y;
 			if (depth < NEAR_PLANE) continue;
 			float4 nor_o = collected_normal_opacity[j];
-			// float normal[3] = {nor_o.x, nor_o.y, nor_o.z};
-			glm::vec3 normal_splt = {normal_scaling.x * s.x, normal_scaling.y * s.y, 1.0f};
-			glm::vec3 normal_view = collected_RS_views[j] * normal_splt;
-			float normal[3] = {normal_view.x, normal_view.y, normal_view.z};
-			float opa = nor_o.w;
-
+			float normal[3] = {nor_o.x, nor_o.y, nor_o.z};
 			float power = -0.5f * rho;
 			if (power > 0.0f)
 				continue;
