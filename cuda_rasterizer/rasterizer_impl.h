@@ -15,6 +15,11 @@
 #include <vector>
 #include "rasterizer.h"
 #include <cuda_runtime_api.h>
+#include <cuda.h>
+#include "cuda_runtime.h"
+#include "device_launch_parameters.h"
+#define GLM_FORCE_CUDA
+#include <glm/glm.hpp>
 
 namespace CudaRasterizer
 {
@@ -36,6 +41,7 @@ namespace CudaRasterizer
 		float2* means2D;
 		float* transMat;
 		float4* normal_opacity;
+		glm::mat3* RS_views;
 		float* rgb;
 		uint32_t* point_offsets;
 		uint32_t* tiles_touched;

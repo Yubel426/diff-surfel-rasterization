@@ -45,6 +45,7 @@ namespace FORWARD
 		float* transMats,
 		float* colors,
 		float4* normal_opacity,
+		glm::mat3* RS_views,
 		const dim3 grid,
 		uint32_t* tiles_touched,
 		bool prefiltered);
@@ -62,6 +63,7 @@ namespace FORWARD
 		const float* normal_scalings,
 		const float* depths,
 		const float4* normal_opacity,
+		const glm::mat3* RS_views,
 		float* final_T,
 		uint32_t* n_contrib,
 		const float* bg_color,
