@@ -172,6 +172,7 @@ __global__ void preprocessCUDA(int P, int D, int M,
 	float* transMats,
 	float* rgb,
 	float4* normal_opacity,
+	glm::mat3* RS_views,
 	const dim3 grid,
 	uint32_t* tiles_touched,
 	bool prefiltered)
@@ -236,8 +237,15 @@ __global__ void preprocessCUDA(int P, int D, int M,
 	depths[idx] = p_view.z;
 	radii[idx] = (int)radius;
 	points_xy_image[idx] = point_image;
+	glm::mat3 RS = quat_to_rotmat(rotations[idx]) * scale_to_mat({scales[idx].x, scales[idx].y, 1.0f}, 1.0f);
+	float3 RS0 = transformVec4x3({RS[0].x, RS[0].y, RS[0].z}, viewmatrix);
+	float3 RS1 = transformVec4x3({RS[1].x, RS[1].y, RS[1].z}, viewmatrix);
+	float3 RS2 = transformVec4x3({RS[2].x, RS[2].y, RS[2].z}, viewmatrix);
+	glm::mat3 RS_view = glm::mat3(RS0.x, RS0.y, RS0.z, RS1.x, RS1.y, RS1.z, RS2.x, RS2.y, RS2.z);
+	// store them in float4
 	normal_opacity[idx] = {normal.x, normal.y, normal.z, opacities[idx]};
 	tiles_touched[idx] = (rect_max.y - rect_min.y) * (rect_max.x - rect_min.x);
+	RS_views[idx] = RS_view;
 }
 
 // Main rasterization method. Collaboratively works on one tile per
@@ -256,6 +264,7 @@ renderCUDA(
 	const float* __restrict__ normal_scalings,
 	const float* __restrict__ depths,
 	const float4* __restrict__ normal_opacity,
+	const glm::mat3* __restrict__ RS_views,
 	float* __restrict__ final_T,
 	uint32_t* __restrict__ n_contrib,
 	const float* __restrict__ bg_color,
@@ -289,6 +298,7 @@ renderCUDA(
 	__shared__ float3 collected_Tv[BLOCK_SIZE];
 	__shared__ float3 collected_Tw[BLOCK_SIZE];
 	__shared__ float2 collected_normal_scaling[BLOCK_SIZE];
+	__shared__ glm::mat3 collected_RS_views[BLOCK_SIZE];
 
 	// Initialize helper variables
 	float T = 1.0f;
@@ -326,6 +336,7 @@ renderCUDA(
 			collected_id[block.thread_rank()] = coll_id;
 			collected_xy[block.thread_rank()] = points_xy_image[coll_id];
 			collected_normal_opacity[block.thread_rank()] = normal_opacity[coll_id];
+			collected_RS_views[block.thread_rank()] = RS_views[coll_id];
 			collected_Tu[block.thread_rank()] = {transMats[9 * coll_id+0], transMats[9 * coll_id+1], transMats[9 * coll_id+2]};
 			collected_Tv[block.thread_rank()] = {transMats[9 * coll_id+3], transMats[9 * coll_id+4], transMats[9 * coll_id+5]};
 			collected_Tw[block.thread_rank()] = {transMats[9 * coll_id+6], transMats[9 * coll_id+7], transMats[9 * coll_id+8]};
@@ -361,7 +372,10 @@ renderCUDA(
 			depth += normal_scaling.x * s.x + normal_scaling.y * s.y;
 			if (depth < NEAR_PLANE) continue;
 			float4 nor_o = collected_normal_opacity[j];
-			float normal[3] = {nor_o.x, nor_o.y, nor_o.z};
+			// float normal[3] = {nor_o.x, nor_o.y, nor_o.z};
+			glm::vec3 normal_splt = {normal_scaling.x * s.x, normal_scaling.y * s.y, 1.0f};
+			glm::vec3 normal_view = collected_RS_views[j] * normal_splt;
+			float normal[3] = {normal_view.x, normal_view.y, normal_view.z};
 			float opa = nor_o.w;
 
 			float power = -0.5f * rho;
@@ -448,6 +462,7 @@ void FORWARD::render(
 	const float* normal_scalings,
 	const float* depths,
 	const float4* normal_opacity,
+	const glm::mat3* RS_views,
 	float* final_T,
 	uint32_t* n_contrib,
 	const float* bg_color,
@@ -465,6 +480,7 @@ void FORWARD::render(
 		normal_scalings,
 		depths,
 		normal_opacity,
+		RS_views,
 		final_T,
 		n_contrib,
 		bg_color,
@@ -494,6 +510,7 @@ void FORWARD::preprocess(int P, int D, int M,
 	float* transMats,
 	float* rgb,
 	float4* normal_opacity,
+	glm::mat3* RS_views,
 	const dim3 grid,
 	uint32_t* tiles_touched,
 	bool prefiltered)
@@ -521,6 +538,7 @@ void FORWARD::preprocess(int P, int D, int M,
 		transMats,
 		rgb,
 		normal_opacity,
+		RS_views,
 		grid,
 		tiles_touched,
 		prefiltered
