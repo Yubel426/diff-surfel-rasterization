@@ -29,6 +29,7 @@ namespace BACKWARD
 		const float* bg_color,
 		const float2* means2D,
 		const float4* normal_opacity,
+		const glm::mat3* __restrict__ RS_views,
 		const float* transMats,
 		const float* colors,
 		const float* normal_scalings,

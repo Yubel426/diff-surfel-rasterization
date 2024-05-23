@@ -374,7 +374,7 @@ renderCUDA(
 			float4 nor_o = collected_normal_opacity[j];
 			// float normal[3] = {nor_o.x, nor_o.y, nor_o.z};
 			glm::vec3 normal_splt = {normal_scaling.x * s.x, normal_scaling.y * s.y, 1.0f};
-			glm::vec3 normal_view = collected_RS_views[j] * normal_splt;
+			glm::vec3 normal_view = glm::normalize(collected_RS_views[j] * normal_splt);
 			float normal[3] = {normal_view.x, normal_view.y, normal_view.z};
 			float opa = nor_o.w;
 			float power = -0.5f * rho;

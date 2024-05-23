@@ -415,6 +415,7 @@ void CudaRasterizer::Rasterizer::backward(
 		background,
 		geomState.means2D,
 		geomState.normal_opacity,
+		geomState.RS_views,
 		color_ptr,
 		transMat_ptr,
 		normal_scalings,

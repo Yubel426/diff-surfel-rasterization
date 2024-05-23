@@ -150,6 +150,7 @@ renderCUDA(
 	const float* __restrict__ bg_color,
 	const float2* __restrict__ points_xy_image,
 	const float4* __restrict__ normal_opacity,
+	const glm::mat3* __restrict__ RS_views,
 	const float* __restrict__ transMats,
 	const float* __restrict__ colors,
 	const float* __restrict__ normal_scalings,
@@ -191,6 +192,8 @@ renderCUDA(
 	__shared__ float3 collected_Tw[BLOCK_SIZE];
 	// __shared__ float collected_depths[BLOCK_SIZE];
 	__shared__ float2 collected_normal_scalings[BLOCK_SIZE];
+	__shared__ glm::mat3 collected_RS_views[BLOCK_SIZE];
+
 
 	// In the forward, we stored the final value for T, the
 	// product of all (1 - alpha) factors. 
@@ -264,6 +267,7 @@ renderCUDA(
 			collected_id[block.thread_rank()] = coll_id;
 			collected_xy[block.thread_rank()] = points_xy_image[coll_id];
 			collected_normal_opacity[block.thread_rank()] = normal_opacity[coll_id];
+			collected_RS_views[block.thread_rank()] = RS_views[coll_id];
 			collected_Tu[block.thread_rank()] = {transMats[9 * coll_id+0], transMats[9 * coll_id+1], transMats[9 * coll_id+2]};
 			collected_Tv[block.thread_rank()] = {transMats[9 * coll_id+3], transMats[9 * coll_id+4], transMats[9 * coll_id+5]};
 			collected_Tw[block.thread_rank()] = {transMats[9 * coll_id+6], transMats[9 * coll_id+7], transMats[9 * coll_id+8]};
@@ -308,7 +312,14 @@ renderCUDA(
 			if (c_d < near_n) continue;
 
 			float4 nor_o = collected_normal_opacity[j];
-			float normal[3] = {nor_o.x, nor_o.y, nor_o.z};
+			glm::vec3 normal_splt = {normal_scaling.x * s.x, normal_scaling.y * s.y, 1.0f};
+			glm::vec3 normal_view_unnorm = collected_RS_views[j] * normal_splt;
+			glm::vec3 normal_view = glm::normalize(normal_view_unnorm);
+			float normal[3] = {normal_view_unnorm.x, normal_view_unnorm.y, normal_view_unnorm.z};
+			const float normal_len = sqrt(normal[0] * normal[0] + normal[1] * normal[1] + normal[2] * normal[2]);
+			glm::vec3 dL_dnormalvec = {dL_dnormal2D[0], dL_dnormal2D[1], dL_dnormal2D[2]};
+			const glm::vec3 dL_dnalpha = s.x / normal_len * collected_RS_views[j][0] * dL_dnormalvec;
+			const glm::vec3 dL_dnbeta = s.y / normal_len * collected_RS_views[j][1] * dL_dnormalvec;
 			float opa = nor_o.w;
 
 			// accumulations
@@ -401,7 +412,8 @@ renderCUDA(
 #if RENDER_AXUTILITY
 			dL_dz += alpha * T * dL_ddepth; 
 #endif
-			const float2 dL_dnormal_scaling = {dL_dz * s.x, dL_dz * s.y};
+			const float2 dL_dnormal_scaling = {dL_dz * s.x + dL_dnalpha.x+dL_dnalpha.y+dL_dnalpha.z, 
+												dL_dz * s.y + dL_dnbeta.x+dL_dnbeta.y+dL_dnbeta.z};
 			atomicAdd(&dL_dnormal_scalings[global_id * 2], dL_dnormal_scaling.x);
 			atomicAdd(&dL_dnormal_scalings[global_id * 2 + 1], dL_dnormal_scaling.y);
 			if (rho3d <= rho2d) {
@@ -711,6 +723,7 @@ void BACKWARD::render(
 	const float* bg_color,
 	const float2* means2D,
 	const float4* normal_opacity,
+	const glm::mat3* __restrict__ RS_views,
 	const float* colors,
 	const float* transMats,
 	const float* normal_scalings,
@@ -734,6 +747,7 @@ void BACKWARD::render(
 		bg_color,
 		means2D,
 		normal_opacity,
+		RS_views,
 		transMats,
 		colors,
 		normal_scalings,
