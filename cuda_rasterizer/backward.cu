@@ -201,8 +201,8 @@ renderCUDA(
 
 	float accum_rec[C] = { 0 };
 	float dL_dpixel[C];
-	float dL_duv[2];
-	float dL_da;
+	float dL_duv[2] = {0};
+	float dL_da = 0;
 
 #if RENDER_AXUTILITY
 	float dL_dreg;
@@ -316,7 +316,7 @@ renderCUDA(
 			const float alpha = min(0.99f, opa * G);
 			if (alpha < 1.0f / 255.0f)
 				continue;
-			if (j == 0) {
+			if (contributor == 0) {
 				const float dL_dG = nor_o.w * dL_da;
 				const int global_id = collected_id[j];
 				if (rho3d <= rho2d) {
