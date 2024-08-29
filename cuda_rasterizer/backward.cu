@@ -201,6 +201,8 @@ renderCUDA(
 
 	float accum_rec[C] = { 0 };
 	float dL_dpixel[C];
+	float dL_duv[2];
+	float dL_da;
 
 #if RENDER_AXUTILITY
 	float dL_dreg;
@@ -238,6 +240,8 @@ renderCUDA(
 	if (inside){
 		for (int i = 0; i < C; i++)
 			dL_dpixel[i] = dL_dpixels[i * H * W + pix_id];
+		float2 dL_duv = {dL_dpixels[(0 + UVA_OFFSET) * H * W + pix_id], dL_dpixels[(1 + UVA_OFFSET) * H * W + pix_id]};
+		float dL_da = dL_dpixels[(2 + UVA_OFFSET) * H * W + pix_id];
 	}
 
 	float last_alpha = 0;
@@ -312,7 +316,54 @@ renderCUDA(
 			const float alpha = min(0.99f, opa * G);
 			if (alpha < 1.0f / 255.0f)
 				continue;
+			if (j == 0) {
+				const float dL_dG = nor_o.w * dL_da;
+				const int global_id = collected_id[j];
+				if (rho3d <= rho2d) {
+					// Update gradients w.r.t. covariance of Gaussian 3x3 (T)
+					const float2 dL_ds = {
+						dL_dG * -G * s.x + dL_duv[0],
+						dL_dG * -G * s.y + dL_duv[1]
+					};
+					const float3 dz_dTw = {s.x, s.y, 1.0};
+					const float dsx_pz = dL_ds.x / p.z;
+					const float dsy_pz = dL_ds.y / p.z;
+					const float3 dL_dp = {dsx_pz, dsy_pz, -(dsx_pz * s.x + dsy_pz * s.y)};
+					const float3 dL_dk = cross(l, dL_dp);
+					const float3 dL_dl = cross(dL_dp, k);
 
+					const float3 dL_dTu = {-dL_dk.x, -dL_dk.y, -dL_dk.z};
+					const float3 dL_dTv = {-dL_dl.x, -dL_dl.y, -dL_dl.z};
+					const float3 dL_dTw = {
+						pixf.x * dL_dk.x + pixf.y * dL_dl.x, 
+						pixf.x * dL_dk.y + pixf.y * dL_dl.y, 
+						pixf.x * dL_dk.z + pixf.y * dL_dl.z};
+
+
+					// Update gradients w.r.t. 3D covariance (3x3 matrix)
+					atomicAdd(&dL_dtransMat[global_id * 9 + 0],  dL_dTu.x);
+					atomicAdd(&dL_dtransMat[global_id * 9 + 1],  dL_dTu.y);
+					atomicAdd(&dL_dtransMat[global_id * 9 + 2],  dL_dTu.z);
+					atomicAdd(&dL_dtransMat[global_id * 9 + 3],  dL_dTv.x);
+					atomicAdd(&dL_dtransMat[global_id * 9 + 4],  dL_dTv.y);
+					atomicAdd(&dL_dtransMat[global_id * 9 + 5],  dL_dTv.z);
+					atomicAdd(&dL_dtransMat[global_id * 9 + 6],  dL_dTw.x);
+					atomicAdd(&dL_dtransMat[global_id * 9 + 7],  dL_dTw.y);
+					atomicAdd(&dL_dtransMat[global_id * 9 + 8],  dL_dTw.z);
+
+				}
+				else{
+					// // Update gradients w.r.t. center of Gaussian 2D mean position
+					const float dG_ddelx = -G * FilterInvSquare * d.x;
+					const float dG_ddely = -G * FilterInvSquare * d.y;
+					atomicAdd(&dL_dmean2D[global_id].x, dL_dG * dG_ddelx); // not scaled
+					atomicAdd(&dL_dmean2D[global_id].y, dL_dG * dG_ddely); // not scaled
+				}
+				// Update gradients w.r.t. opacity of the Gaussian
+				atomicAdd(&(dL_dopacity[global_id]), G * dL_da);
+			}
+			// j>0 loop
+			else{
 			T = T / (1.f - alpha);
 			const float dchannel_dcolor = alpha * T;
 			const float w = alpha * T;
@@ -435,6 +486,8 @@ renderCUDA(
 
 			// Update gradients w.r.t. opacity of the Gaussian
 			atomicAdd(&(dL_dopacity[global_id]), G * dL_dalpha);
+			}
+			// j>0 loop done
 		}
 	}
 }

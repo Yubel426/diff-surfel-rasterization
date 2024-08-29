@@ -303,7 +303,7 @@ renderCUDA(
 	uint32_t contributor = 0;
 	uint32_t last_contributor = 0;
 	float C[CHANNELS] = { 0 };
-
+	float UVA[3] = {0};
 
 #if RENDER_AXUTILITY
 	// render axutility ouput
@@ -379,6 +379,13 @@ renderCUDA(
 			float alpha = min(0.99f, opa * exp(power));
 			if (alpha < 1.0f / 255.0f)
 				continue;
+			if (j == 0){
+				UVA[0] = s.x;
+				UVA[1] = s.y;
+				UVA[2] = alpha;
+			}
+			// j > 0 loop
+			else{
 			float test_T = T * (1 - alpha);
 			if (test_T < 0.0001f)
 			{
@@ -414,6 +421,8 @@ renderCUDA(
 			// Keep track of last range entry to update this
 			// pixel.
 			last_contributor = contributor;
+			}
+			// j>0 loop done
 		}
 	}
 
@@ -425,6 +434,8 @@ renderCUDA(
 		n_contrib[pix_id] = last_contributor;
 		for (int ch = 0; ch < CHANNELS; ch++)
 			out_color[ch * H * W + pix_id] = C[ch] + T * bg_color[ch];
+		for (int ch = 0; ch < 3; ch++)
+			out_color[(ch + UVA_OFFSET) * H * W + pix_id] = UVA[ch];
 
 #if RENDER_AXUTILITY
 		n_contrib[pix_id + H * W] = median_contributor;
