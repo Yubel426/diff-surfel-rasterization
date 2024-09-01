@@ -27,7 +27,7 @@
 #define DISTORTION_OFFSET 6
 // #define MEDIAN_WEIGHT_OFFSET 7
 
-#define UVA_OFFSET 3
+#define UVAI_OFFSET 3
 
 // distortion helper macros
 #define BACKFACE_CULL 1

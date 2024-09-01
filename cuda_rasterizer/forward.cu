@@ -303,7 +303,7 @@ renderCUDA(
 	uint32_t contributor = 0;
 	uint32_t last_contributor = 0;
 	float C[CHANNELS] = { 0 };
-	float UVA[3] = {0};
+	float UVAI[4] = {0};
 
 #if RENDER_AXUTILITY
 	// render axutility ouput
@@ -351,6 +351,7 @@ renderCUDA(
 			const float3 Tu = collected_Tu[j];
 			const float3 Tv = collected_Tv[j];
 			const float3 Tw = collected_Tw[j];
+			const int index = collected_id[j];
 			float3 k = pix.x * Tw - Tu;
 			float3 l = pix.y * Tw - Tv;
 			float3 p = cross(k, l);
@@ -379,10 +380,11 @@ renderCUDA(
 			float alpha = min(0.99f, opa * exp(power));
 			if (alpha < 1.0f / 255.0f)
 				continue;
-			if (j == 0){
-				UVA[0] = s.x;
-				UVA[1] = s.y;
-				UVA[2] = alpha;
+			if (contributor == 1){
+				UVAI[0] = s.x;
+				UVAI[1] = s.y;
+				UVAI[2] = alpha;
+				UVAI[3] = index;
 			}
 			// j > 0 loop
 			else{
@@ -434,8 +436,8 @@ renderCUDA(
 		n_contrib[pix_id] = last_contributor;
 		for (int ch = 0; ch < CHANNELS; ch++)
 			out_color[ch * H * W + pix_id] = C[ch] + T * bg_color[ch];
-		for (int ch = 0; ch < 3; ch++)
-			out_color[(ch + UVA_OFFSET) * H * W + pix_id] = UVA[ch];
+		for (int ch = 0; ch < 4; ch++)
+			out_color[(ch + UVAI_OFFSET) * H * W + pix_id] = UVAI[ch];
 
 #if RENDER_AXUTILITY
 		n_contrib[pix_id + H * W] = median_contributor;

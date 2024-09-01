@@ -240,8 +240,8 @@ renderCUDA(
 	if (inside){
 		for (int i = 0; i < C; i++)
 			dL_dpixel[i] = dL_dpixels[i * H * W + pix_id];
-		float2 dL_duv = {dL_dpixels[(0 + UVA_OFFSET) * H * W + pix_id], dL_dpixels[(1 + UVA_OFFSET) * H * W + pix_id]};
-		float dL_da = dL_dpixels[(2 + UVA_OFFSET) * H * W + pix_id];
+		float2 dL_duv = {dL_dpixels[(0 + UVAI_OFFSET) * H * W + pix_id], dL_dpixels[(1 + UVAI_OFFSET) * H * W + pix_id]};
+		float dL_da = dL_dpixels[(2 + UVAI_OFFSET) * H * W + pix_id];
 	}
 
 	float last_alpha = 0;
