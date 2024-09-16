@@ -201,8 +201,9 @@ renderCUDA(
 
 	float accum_rec[C] = { 0 };
 	float dL_dpixel[C];
-	float dL_duv[2] = {0};
+	float2 dL_duv = {0, 0};
 	float dL_da = 0;
+	const int max_contributor = inside ? n_contrib[pix_id + 2 * H * W] : 0;
 
 #if RENDER_AXUTILITY
 	float dL_dreg;
@@ -240,8 +241,8 @@ renderCUDA(
 	if (inside){
 		for (int i = 0; i < C; i++)
 			dL_dpixel[i] = dL_dpixels[i * H * W + pix_id];
-		float2 dL_duv = {dL_dpixels[(0 + UVAI_OFFSET) * H * W + pix_id], dL_dpixels[(1 + UVAI_OFFSET) * H * W + pix_id]};
-		float dL_da = dL_dpixels[(2 + UVAI_OFFSET) * H * W + pix_id];
+		dL_duv = {dL_dpixels[(0 + UVAI_OFFSET) * H * W + pix_id], dL_dpixels[(1 + UVAI_OFFSET) * H * W + pix_id]};
+		dL_da = dL_dpixels[(2 + UVAI_OFFSET) * H * W + pix_id];
 	}
 
 	float last_alpha = 0;
@@ -316,14 +317,14 @@ renderCUDA(
 			const float alpha = min(0.99f, opa * G);
 			if (alpha < 1.0f / 255.0f)
 				continue;
-			if (contributor == 0) {
-				const float dL_dG = nor_o.w * dL_da;
+			if (contributor == max_contributor - 1) {
 				const int global_id = collected_id[j];
+				const float dL_dG = nor_o.w * dL_da;
 				if (rho3d <= rho2d) {
 					// Update gradients w.r.t. covariance of Gaussian 3x3 (T)
 					const float2 dL_ds = {
-						dL_dG * -G * s.x + dL_duv[0],
-						dL_dG * -G * s.y + dL_duv[1]
+						dL_dG * -G * s.x + dL_duv.x,
+						dL_dG * -G * s.y + dL_duv.y
 					};
 					const float3 dz_dTw = {s.x, s.y, 1.0};
 					const float dsx_pz = dL_ds.x / p.z;

@@ -304,6 +304,7 @@ renderCUDA(
 	uint32_t last_contributor = 0;
 	float C[CHANNELS] = { 0 };
 	float UVAI[4] = {0};
+	int32_t max_contributor = -1;
 
 #if RENDER_AXUTILITY
 	// render axutility ouput
@@ -351,7 +352,7 @@ renderCUDA(
 			const float3 Tu = collected_Tu[j];
 			const float3 Tv = collected_Tv[j];
 			const float3 Tw = collected_Tw[j];
-			const int index = collected_id[j];
+			float index = static_cast<float>(collected_id[j]);
 			float3 k = pix.x * Tw - Tu;
 			float3 l = pix.y * Tw - Tv;
 			float3 p = cross(k, l);
@@ -380,11 +381,13 @@ renderCUDA(
 			float alpha = min(0.99f, opa * exp(power));
 			if (alpha < 1.0f / 255.0f)
 				continue;
-			if (contributor == 1){
+			if (max_contributor < 0){
 				UVAI[0] = s.x;
 				UVAI[1] = s.y;
 				UVAI[2] = alpha;
 				UVAI[3] = index;
+				max_contributor = contributor;
+				last_contributor = contributor;
 			}
 			// j > 0 loop
 			else{
@@ -434,6 +437,7 @@ renderCUDA(
 	{
 		final_T[pix_id] = T;
 		n_contrib[pix_id] = last_contributor;
+		n_contrib[pix_id + 2 * H * W] = max_contributor;
 		for (int ch = 0; ch < CHANNELS; ch++)
 			out_color[ch * H * W + pix_id] = C[ch] + T * bg_color[ch];
 		for (int ch = 0; ch < 4; ch++)
