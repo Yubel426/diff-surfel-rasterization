@@ -326,7 +326,6 @@ renderCUDA(
 						dL_dG * -G * s.x + dL_duv.x,
 						dL_dG * -G * s.y + dL_duv.y
 					};
-					const float3 dz_dTw = {s.x, s.y, 1.0};
 					const float dsx_pz = dL_ds.x / p.z;
 					const float dsy_pz = dL_ds.y / p.z;
 					const float3 dL_dp = {dsx_pz, dsy_pz, -(dsx_pz * s.x + dsy_pz * s.y)};
