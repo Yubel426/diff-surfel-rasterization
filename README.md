@@ -1,6 +1,6 @@
 # Differential Surfel Rasterization
 
-This is the rasterization engine for the paper "2D Gaussian Splatting for  Geometrically Accurate Radiance Fields". If you can make use of it in your own research, please be so kind to cite us.
+This is the rasterization engine for texturegs. If you can make use of it in your own research, please be so kind to cite us.
 
 <section class="section" id="BibTeX">
   <div class="container is-max-desktop content">
